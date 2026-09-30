@@ -1,0 +1,10 @@
+/.bundle
+/vendor/bundle
+/.env*
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+/pkg/
+*.gem
+/coverage/
