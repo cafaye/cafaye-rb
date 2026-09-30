@@ -127,9 +127,14 @@ class TokenVerifierTest < TestSupport::Test
   # --- the key set ---------------------------------------------------------
 
   def test_a_token_signed_by_an_unknown_key_is_refused
-    other = TestSupport::Keys.key("key-unknown")
+    # Signed with the published key under a `kid` the key set does not carry. A
+    # different private key would answer the same question at the cost of a
+    # second of RSA keygen, and would test something an attacker cannot do —
+    # they do not have the signing key at all, which is why the other tests here
+    # are about the header rather than the signature.
+    unknown = TestSupport::Tokens.signed_token(KEY, claims, { "kid" => "key-not-published" })
 
-    assert_raises(Cafaye::Errors::UnknownKey) { @verifier.verify!(access_token(other)) }
+    assert_raises(Cafaye::Errors::UnknownKey) { @verifier.verify!(unknown) }
   end
 
   def test_a_rotated_key_is_picked_up_with_exactly_one_extra_fetch
@@ -150,8 +155,14 @@ class TokenVerifierTest < TestSupport::Test
     # outbound requests in the whole window, because the initial load is the
     # only fetch this cache generation buys and the forced refresh is rate
     # limited behind it.
+    #
+    # Every one of them is signed with the *real* published key under a `kid` it
+    # was never published under, because that is the attack: the `kid` is
+    # attacker-chosen, and a test that minted ten fresh key pairs would be
+    # spending a second of keygen per request to test something that is not
+    # what an attacker does.
     10.times do |index|
-      ghost = access_token(key("ghost-#{index}"))
+      ghost = TestSupport::Tokens.signed_token(KEY, claims, { "kid" => "ghost-#{index}" })
       assert_raises(Cafaye::Errors::UnknownKey) { @verifier.verify!(ghost) }
     end
 
@@ -160,7 +171,7 @@ class TokenVerifierTest < TestSupport::Test
   end
 
   def test_a_repeated_unknown_key_id_makes_no_second_request
-    ghost = access_token(key("key-ghost"))
+    ghost = TestSupport::Tokens.signed_token(KEY, claims, { "kid" => "key-ghost" })
     5.times { assert_raises(Cafaye::Errors::UnknownKey) { @verifier.verify!(ghost) } }
 
     assert_equal(1, @server.fetch_count)

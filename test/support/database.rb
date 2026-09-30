@@ -2,6 +2,8 @@
 
 require "pg"
 require "uri"
+require "json"
+require "time"
 
 module TestSupport
   # The suite's PostgreSQL database: created if it is missing, and always the
@@ -59,9 +61,33 @@ module TestSupport
       nil
     end
 
+    # A clean schema for one test: create the tables if they are missing, then
+    # truncate.
+    #
+    # Truncate rather than drop-and-recreate. Recreating per test took the suite
+    # from one second to ten, which is ten seconds of a developer waiting to
+    # learn whether a change is green — and the next thing to happen after that
+    # is someone adding a `sleep` to work around the slowness.
     def reset_schema!
-      connection.exec("drop table if exists outbox_events")
+      create_tables!
+      connection.exec("truncate outbox_events, probe restart identity")
+    end
+
+    # The schema itself. For `bin/prime`, and for a test that has deliberately
+    # dropped a table.
+    def create_tables!
       connection.exec(File.read(DDL_PATH))
+      # A stand-in for the domain tables a service owns, so the rollback tests
+      # can write a "domain row" in the same transaction and watch it disappear
+      # with the event. It is deliberately the *service's* table, not the gem's:
+      # the gem never touches it, and a test that used the gem's own table to
+      # prove a transaction rolled back would be proving something much smaller.
+      connection.exec(<<~SQL)
+        create table if not exists probe (
+          id serial primary key,
+          name text not null unique
+        )
+      SQL
     end
 
     def connection
@@ -72,6 +98,42 @@ module TestSupport
       rescue PG::Error => error
         raise Unreachable, "cannot reach the test database at #{url}: #{error.message.strip}"
       end
+    end
+
+    # Result rows as Ruby values.
+    #
+    # The `pg` driver hands back every column as a String unless a type map is
+    # installed, and the JSON text decoder in pg 1.6 raises on the arguments its
+    # own C code passes it — so the decoding lives here, in one place, rather
+    # than in a driver internal that changes between patch releases. `data`
+    # becomes a Hash and `time` a UTC Time, which is what `envelope.data` and
+    # `envelope.time` already are, so a test can compare a row with an envelope
+    # without a re-parse in between.
+    def rows(result)
+      result.map { |row| decode(row) }
+    end
+
+    def row(result)
+      result.first && decode(result.first)
+    end
+
+    def decode(row)
+      row.each_with_object({}) do |(column, value), out|
+        out[column] =
+          case column
+          when "data" then value.is_a?(String) ? JSON.parse(value) : value
+          when "time", "created_at", "published_at" then decode_time(value)
+          when "attempts" then value.to_i
+          else value
+          end
+      end
+    end
+
+    def decode_time(value)
+      return nil if value.nil?
+      return value.utc if value.is_a?(Time)
+
+      Time.parse(value.to_s).utc
     end
 
     def with_connection

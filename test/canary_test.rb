@@ -130,9 +130,7 @@ class CanaryTest < TestSupport::Test
     # a key id is a substring of a token's own header, and a log full of them
     # is a log full of attacker-chosen strings next to the fact that a key set
     # was consulted.
-    ghost = TestSupport::Tokens.access_token(
-      TestSupport::Keys.key("key-ghost"), issuer: @server.issuer, audience: AUDIENCE, now: now
-    )
+    ghost = TestSupport::Tokens.signed_token(KEY, claims_for_building, { "kid" => "key-ghost" })
 
     error = assert_raises(Cafaye::Errors::UnknownKey) { @verifier.verify!(ghost) }
 
@@ -142,6 +140,19 @@ class CanaryTest < TestSupport::Test
   end
 
   # --- the unit-level statements behind the integration assertion ------------
+
+  def claims_for_building
+    {
+      "iss" => @server.issuer,
+      "aud" => AUDIENCE,
+      "sub" => "usr_01J9Z8QK5M4N7P2R3T6V8W9X0A",
+      "exp" => now.to_i + 900,
+      "iat" => now.to_i,
+      "jti" => "jti_01J9Z8QK5M4N7P2R3T6V8W9X0A",
+      "account_id" => "acc_01J9Z8QK5M4N7P2R3T6V8W9X0A",
+      "scopes" => %w[billing:read billing:write]
+    }
+  end
 
   def test_a_token_object_will_not_print_itself
     # The mechanism, stated at the unit level so the integration test above is
