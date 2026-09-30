@@ -1,0 +1,64 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prime:
+    name: bin/prime (ruby ${{ matrix.ruby }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The version in mise.toml, and the oldest one this gem supports per the
+        # gemspec. Both run, because a security library that only ever sees one
+        # interpreter is a library whose security paths have only been proven on
+        # one interpreter.
+        ruby: ["3.2", "4.0"]
+
+    services:
+      postgres:
+        # The outbox is a Postgres table and the transaction guarantee is a
+        # property of Postgres, so the suite runs against a real one. It is a
+        # service container rather than a mock for the reason in
+        # test/support/database.rb.
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      CAFAYE_TEST_DATABASE_URL: postgres://postgres@127.0.0.1:5432/cafaye_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+          # bundler-cache runs `bundle install` with the lockfile's platform set
+          # to this runner's, so it cannot drift the file CI is testing.
+          bundler-cache: true
+
+      - name: bin/prime
+        run: ./bin/prime
+
+      - name: The suite left no uncommitted change behind
+        run: |
+          git diff --exit-code Gemfile.lock cafaye.gemspec
