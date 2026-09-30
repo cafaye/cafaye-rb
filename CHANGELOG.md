@@ -9,6 +9,31 @@ commit that caused it and the one line that changes to opt back in.
 
 ## [Unreleased]
 
+### Added
+
+- **`gate.yml`** — this repository declares its gate rather than leaving it to be
+  discovered by getting it wrong: the command, the entrypoint, the mise task it
+  must resolve to, five proofs of what "the gate ran" looks like in its output,
+  and the five things the gate needs that are not in this repository (an
+  interpreter, two network hosts, a PostgreSQL server, and a checkout of core).
+  Written against `core/schemas/gate.schema.json` and checked by core's
+  `harness/gate_check.py`. `selfContained` is `false`, and the reason is not a
+  formality: with core absent the suite is red — see REPORT-core-10.md.
+- **`test/gate_declaration_self_test.sh`** — twenty-two cases proving the
+  declaration is load-bearing: one control, two warning cases, and nineteen
+  deliberate breakages, eight of which break `bin/prime` or the suite itself and
+  can only be caught by running the gate. Not wired into `bin/prime`, because a
+  self-test inside every gate invocation would be a second gate that can disagree
+  with the first.
+
+### Changed
+
+- **`.github/workflows/ci.yml`** — the gate step is written as a `run: |` block
+  scalar rather than `run: ./bin/prime` on one line. The command is identical;
+  the spelling is not. core's gate checker cannot see a one-line `run:` at all,
+  so with the old spelling it reported that this workflow never runs the gate.
+  Both directions of that checker defect are demonstrated in REPORT-core-10.md.
+
 ## [0.1.0] — 2026-09-30
 
 The first real packet in a repository that was an empty scaffold. Three

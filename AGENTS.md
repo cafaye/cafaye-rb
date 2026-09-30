@@ -62,6 +62,32 @@ Run these; do not improvise equivalents.
 creates its own test database from the reference DDL, so a clean checkout primes
 with no manual step. Point it elsewhere with `CAFAYE_TEST_DATABASE_URL`.
 
+**The gate is declared in `gate.yml`, not discovered.** It is written against
+`core/schemas/gate.schema.json`, checked by core's `harness/gate_check.py`, and
+it says the two things a `mise` task structurally cannot: what the gate needs
+from the machine (`selfContained: false`, plus five requirements), and what its
+own output must contain before "passed" means anything (five `proof` entries).
+
+Two consequences for anyone changing this repository:
+
+- **Adding a test means raising `gate.proof[].suite.minimum`**, or at least
+  deciding you did not need to. The floor is a decrease-detector: it is 220
+  against a suite that reports 228. Nothing enforces the upward direction the way
+  core's `test_the_gate_floor_is_not_below_the_suite_core_claims` does — that
+  ratchet is **owed** and named in REPORT-core-10.md.
+- **The gate needs a checkout of `core` beside this one.** `test/contract/` reads
+  core's schema and doc directly; two of those tests need the real files and go
+  red without them. `CORE_PATH` overrides the location. This is why CI has to
+  clone core before `./bin/prime`, and it does not yet — so the gate as committed
+  is red on a runner. Reported, not fixed; see REPORT-core-10.md.
+
+To check the declaration, and to check that it can still fail:
+
+```
+bash test/gate_declaration_self_test.sh            # ~90s: 19 breakages
+bash test/gate_declaration_self_test.sh --static   # ~5s: the static half
+```
+
 ## Rules
 
 **Tests first, and shown failing.** A test that has never failed has never
