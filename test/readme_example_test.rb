@@ -57,7 +57,12 @@ class ReadmeExampleTest < TestSupport::Test
     # What `create!` does: the insert and the callback, in one transaction.
     def save!
       @connection.transaction do
-        @connection.exec("insert into probe (name) values ($1)", [ id ])
+        # `exec_params` rather than `exec(sql, params)`: the two-argument form of
+        # `exec` forwards to it and the `pg` gem warns that it is deprecated. The
+        # warning is noise in a suite whose whole job is to be the output someone
+        # reads at 3am, and a library whose own tests carry a deprecation is a
+        # library whose next major is somebody else's problem.
+        @connection.exec_params("insert into probe (name) values ($1)", [ id ])
         publish_created
         self
       end
