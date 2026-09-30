@@ -124,9 +124,18 @@ module Cafaye
 
       private
 
+      # The insert, in both placeholder conventions the two adapters need:
+      # `$1..$6` for `pg`'s `exec_params`, and `?` for Active Record's
+      # `sanitize_sql_array`. Two spellings of one statement, adjacent, so the two
+      # adapters cannot drift into writing different SQL.
       INSERT_SQL = <<~SQL
         insert into outbox_events (id, event_type, source, subject, time, data)
         values ($1, $2, $3, $4, $5::timestamptz, $6::jsonb)
+      SQL
+
+      INSERT_TEMPLATE = <<~SQL
+        insert into outbox_events (id, event_type, source, subject, time, data)
+        values (?, ?, ?, ?, ?::timestamptz, ?::jsonb)
       SQL
 
       # No `on conflict do nothing`. A conflict here means a uuid collision or a

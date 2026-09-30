@@ -21,17 +21,17 @@ require_relative "support/tokens"
 module TestSupport
   # The coverage report and its floor.
   #
-  # The floor starts at 60% on the bootstrap commit — the gem is four lines and a
+  # The floor started at 60% on the bootstrap commit — the gem was four lines and a
   # file of error classes at that point, and a floor of 90% over that would only
-  # be asserting that the repository does not yet contain the library. It is
-  # raised at every deliverable commit, and the trajectory is recorded in
-  # AGENTS.md: 60% at bootstrap, 90% with the verifier, 95% with the outbox.
+  # have been asserting that the repository does not yet contain the library. It is
+  # raised at every deliverable commit: 60% at bootstrap, 90% with the verifier,
+  # 95% with the outbox and the Railtie. The trajectory is in AGENTS.md.
   #
-  # Raising a floor is always allowed. Lowering one, or adding an inline exclude
-  # to make a build green, is not — a threshold that moves down is a gate that
-  # stopped being a gate.
+  # Raising a floor is always allowed. Lowering one, or adding an inline exclude to
+  # make a build green, is not — a threshold that moves down is a gate that stopped
+  # being a gate.
   module Coverage
-    FLOOR = 90.0
+    FLOOR = 95.0
 
     # This gem's `lib/`, as an absolute path.
     #

@@ -33,18 +33,17 @@ module Cafaye
       end
 
       def insert(envelope)
-        connection.exec_insert(
-          ActiveRecordConnection::INSERT_SQL,
-          "Cafaye Outbox Insert",
-          [ nil,
-            ActiveRecord::Relation::QueryAttribute.new("id", envelope.id, ActiveRecord::Type::Uuid.new),
-            ActiveRecord::Relation::QueryAttribute.new("event_type", envelope.type, ActiveRecord::Type::String.new),
-            ActiveRecord::Relation::QueryAttribute.new("source", envelope.source, ActiveRecord::Type::String.new),
-            ActiveRecord::Relation::QueryAttribute.new("subject", envelope.subject, ActiveRecord::Type::String.new),
-            ActiveRecord::Relation::QueryAttribute.new("time", envelope.time, ActiveRecord::Type::Time.new),
-            ActiveRecord::Relation::QueryAttribute.new("data", JSON.generate(envelope.data),
-                                                       ActiveRecord::Type::Json.new)
-          ]
+        # Quoted by Active Record rather than by hand, and rather than through
+        # `QueryAttribute` and a type object per column: `sanitize_sql_array` is
+        # the supported path, it quotes and casts every value through the adapter,
+        # and it does not need this library to know that PostgreSQL spells its
+        # uuid type `uuid` and Active Record spells its class something else.
+        connection.execute(
+          ::ActiveRecord::Base.sanitize_sql_array(
+            [ PgConnection::INSERT_TEMPLATE,
+              envelope.id, envelope.type, envelope.source, envelope.subject,
+              envelope.time.utc.iso8601, JSON.generate(envelope.data) ]
+          )
         )
         nil
       end
@@ -68,12 +67,17 @@ module Cafaye
         ).map { |row| ActiveRecordConnection.row_from(row) }
       end
 
+      # `exec_update`'s third argument is a flat list of bind values. The extra
+      # leading type caster belongs to `exec_insert`, whose first column is an
+      # auto-generated primary key; passing one here tells Active Record the
+      # statement has two placeholders, and PostgreSQL answers `could not
+      # determine data type of parameter $2`.
       def mark_published(id)
-        connection.exec_update(ActiveRecordConnection::MARK_PUBLISHED_SQL, "Cafaye Outbox Mark", [ nil, id ])
+        connection.exec_update(ActiveRecordConnection::MARK_PUBLISHED_SQL, "Cafaye Outbox Mark", [ id ])
       end
 
       def mark_failed(id)
-        connection.exec_update(ActiveRecordConnection::MARK_FAILED_SQL, "Cafaye Outbox Mark", [ nil, id ])
+        connection.exec_update(ActiveRecordConnection::MARK_FAILED_SQL, "Cafaye Outbox Mark", [ id ])
       end
 
       def transaction(&block)
@@ -112,7 +116,8 @@ module Cafaye
         end
       end
 
-      INSERT_SQL = PgConnection::INSERT_SQL
+      # The statements both adapters share, in `pg`'s placeholder convention.
+      # `claim_batch` interpolates its own four; these two bind directly.
       MARK_PUBLISHED_SQL = PgConnection::MARK_PUBLISHED_SQL
       MARK_FAILED_SQL = PgConnection::MARK_FAILED_SQL
     end

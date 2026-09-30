@@ -10,6 +10,10 @@ AllCops:
     - "vendor/**/*"
     - "tmp/**/*"
     - "log/**/*"
+    # A Rails generator template. It is an ERB file that becomes a migration, not
+    # a Ruby file that Ruby can parse, and linting it would be linting the
+    # template's own interpolation syntax.
+    - "lib/cafaye/generators/templates/**/*"
 
 # The library is `require`d by name, not by path, so the tests reach the
 # installed code path rather than a copy that only exists in this checkout.
