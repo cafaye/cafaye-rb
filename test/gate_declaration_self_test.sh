@@ -231,7 +231,21 @@ edit "$six/gate.yml" 'workflow: .github/workflows/ci.yml' 'workflow: .github/wor
 expect_red 'a declaration naming a CI workflow that is not in this repository' "$six" 'gate.ci-missing'
 
 seven="$(fresh_copy ci-disagrees)"
-edit "$seven/.github/workflows/ci.yml" '          ./bin/prime' '          echo "nothing here"'
+# The anchor is the ONE-LINE spelling `run: ./bin/prime`, which is what this
+# repository's workflow now carries. It used to be the block-scalar body line
+# (`          ./bin/prime`), because the step was a block scalar for a reason that
+# no longer exists: core's RUN_KEY could not see a one-line `run:` (D12, fixed in
+# core 63fd319), so the step was written `run: |` purely to be visible to
+# gate.ci-disagrees. That accommodation is retired — see the commit on
+# .github/workflows/ci.yml — and this anchor is deliberately the one-line form.
+#
+# It also makes this the case that would catch a REGRESSION of the core fix. If
+# RUN_KEY went back to being blind to a one-line `run:`, breakage 7 would still
+# go red (nothing here is invisible too) and prove nothing; the case that fails
+# is the CONTROL above, which asserts this repository as committed is green, and
+# it is green only while core can see `run: ./bin/prime`. A red control is a
+# blocking failure, not a finding to disclose.
+edit "$seven/.github/workflows/ci.yml" '        run: ./bin/prime' '        run: echo "nothing here"'
 expect_red 'a CI workflow that no longer runs the gate' "$seven" 'gate.ci-disagrees'
 
 eight="$(fresh_copy requirement-path-missing)"

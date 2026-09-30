@@ -69,17 +69,25 @@ see the most common way a CI step is written. It went unnoticed because core's
 own conforming fixture happens to use `run: |`, which is the one spelling the
 regex accepts.
 
-**What I did about it, and why.** I changed one step in this repository's
-workflow from `run: ./bin/prime` to `run: |` + `./bin/prime`. The command is
-byte-identical and `bin/prime` is untouched — this is not a behaviour change and
-not a loosened anything. It is here because the alternative was to either edit a
-correct declaration into something the checker can read, or delete a correct `ci`
-block, and both of those trade a real check for a green. It also *restores* the
-check: before this change, cafaye-rb's gate step was structurally invisible to
-`gate.ci-disagrees`, so deleting it from CI would have gone unnoticed. Once core
-fixes the regex, the accommodation is unnecessary but harmless.
+**What I did about it, at the time, and why.** I changed one step in this
+repository's workflow from `run: ./bin/prime` to `run: |` + `./bin/prime`, with a
+comment above it saying why. The command was byte-identical and `bin/prime` was
+untouched — not a behaviour change, not a loosened anything. It was there because
+the alternative was to either edit a correct declaration into something the
+checker could read, or delete a correct `ci` block, and both of those trade a
+real check for a green.
 
-The fix belongs in core, in a different packet, and I have not touched it.
+**That accommodation is retired, and this paragraph is stale — corrected here so
+the file does not lie.** `core` fixed `RUN_KEY` in `63fd319` (D12): every `run:`
+spelling is read now, so the reason the step was a block scalar no longer
+exists. The workflow step is `run: ./bin/prime` on one line again and the
+comment is deleted. Both directions were verified against core's fixed checker:
+the restored one-liner is `OK … 0 failure(s)`, and deleting that step from the
+same tree is `FAIL gate.ci-disagrees: .github/workflows/ci.yml never runs
+./bin/prime`, exit 1. The fix belongs in core and landed there; this paragraph is
+kept because "we wrote a workaround and then removed it" is the useful record, and
+because the next reader who greps for the block scalar should find the history
+rather than nothing.
 
 ### One smaller note, same theme
 
@@ -97,7 +105,7 @@ knowing before someone lowers it.
 | --- | --- |
 | `gate.yml` | the declaration, true of this repository, with the judgement calls written down |
 | `test/gate_declaration_self_test.sh` | 22 cases: 1 control, 2 warning cases, 19 breakages |
-| `.github/workflows/ci.yml` | one step's spelling changed, so the CI check can read it |
+| `.github/workflows/ci.yml` | the gate step, spelled `run: ./bin/prime` on one line as every other service spells it |
 | `CHANGELOG.md`, `AGENTS.md` | the entry and the description of the repository as it now is |
 
 ### The declaration

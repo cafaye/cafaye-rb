@@ -56,19 +56,8 @@ jobs:
           # to this runner's, so it cannot drift the file CI is testing.
           bundler-cache: true
 
-      # A block scalar rather than `run: ./bin/prime` on one line, and the
-      # command is byte-identical either way — this is not a behaviour change.
-      #
-      # It is here because core's gate declaration is checked by
-      # harness/gate_check.py, whose RUN_KEY regular expression only matches a
-      # `run:` key that is bare or carries a `|`/`>` block scalar. A one-line
-      # `run: ./bin/prime` is invisible to it, so `gate.ci-disagrees` reports
-      # that this workflow never runs the gate when it plainly does. Written this
-      # way the step is readable, and the check that exists to catch CI drift is
-      # actually looking at it. See REPORT-core-10.md.
       - name: bin/prime
-        run: |
-          ./bin/prime
+        run: ./bin/prime
 
       - name: The suite left no uncommitted change behind
         run: |

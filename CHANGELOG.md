@@ -28,11 +28,17 @@ commit that caused it and the one line that changes to opt back in.
 
 ### Changed
 
-- **`.github/workflows/ci.yml`** — the gate step is written as a `run: |` block
-  scalar rather than `run: ./bin/prime` on one line. The command is identical;
-  the spelling is not. core's gate checker cannot see a one-line `run:` at all,
-  so with the old spelling it reported that this workflow never runs the gate.
-  Both directions of that checker defect are demonstrated in REPORT-core-10.md.
+- **`.github/workflows/ci.yml`** — the gate step is `run: ./bin/prime` on one
+  line again, the spelling the other eight services use. It was a `run: |` block
+  scalar, with a comment above it saying why: core's gate checker could not see a
+  one-line `run:` at all, so the step had to be written in a shape the checker
+  could read (D12, fixed in core `63fd319`). The command was byte-identical
+  either way, so this is not a behaviour change — it retires a permanent
+  accommodation for a defect that no longer exists. Verified in both directions
+  against core's fixed checker: the one-liner is `OK … 0 failure(s)`, and
+  deleting the step from the same tree is `FAIL gate.ci-disagrees`, exit 1.
+  REPORT-core-10.md carries the history and is corrected rather than left
+  asserting a limitation that is gone.
 
 ## [0.1.0] — 2026-09-30
 
