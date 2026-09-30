@@ -329,6 +329,41 @@ class OutboxPublisherTest < TestSupport::Test
 
   # --- configuration -------------------------------------------------------
 
+  def test_a_pass_run_inside_a_callers_transaction_joins_it_rather_than_committing_it
+    # `pg`'s own `Connection#transaction` issues `BEGIN` unconditionally and
+    # commits in an `ensure`, so a publisher that used it directly would commit
+    # the caller's transaction early — the one bug a library whose promise is
+    # "the caller's transaction decides whether this row survives" cannot have.
+    seed(2)
+
+    @connection.transaction do
+      publisher.run_once
+
+      # Still open, and still uncommitted: the marks made by the pass are the
+      # caller's business, not the loop's.
+      assert_equal PG::PQTRANS_INTRANS, @connection.transaction_status
+    end
+
+    assert_equal 2, published_count
+  end
+
+  def test_a_pass_inside_a_transaction_that_rolls_back_leaves_the_rows_claimable
+    seed(1)
+    delivered = []
+    @deliverer = ->(envelope) { delivered << envelope }
+
+    assert_raises(RuntimeError) do
+      @connection.transaction do
+        publisher.run_once
+        raise "the caller changed its mind"
+      end
+    end
+
+    assert_equal 1, delivered.size, "the transport was called, which is correct"
+    assert_equal 0, published_count, "the mark was committed, which is not"
+    assert_equal 1, publisher.run_once.claimed, "the row is still claimable"
+  end
+
   def test_it_refuses_a_batch_size_that_is_not_positive
     assert_raises(Cafaye::Errors::ConfigurationError) { publisher.run_once(batch_size: 0) }
   end

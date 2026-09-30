@@ -80,6 +80,9 @@ module Cafaye
         connection.exec_update(ActiveRecordConnection::MARK_FAILED_SQL, "Cafaye Outbox Mark", [ id ])
       end
 
+      # Active Record *is* nesting-aware: a `transaction` inside another joins the
+      # outer one and only the outermost commits. So this delegates, and the
+      # `PgConnection` equivalent's own guard is not needed here.
       def transaction(&block)
         connection.transaction(&block)
       end

@@ -207,15 +207,7 @@ class RailtieTest < TestSupport::Test
     # The outbox table belongs to the service, in the service's repository, in
     # the service's own migration — core's wording, and this is the mechanism.
     # The generator copies the reference DDL into a timestamped migration.
-    destination = File.join(Dir.tmpdir, "cafaye-generator-#{Process.pid}")
-    FileUtils.mkdir_p(destination)
-
-    Cafaye::Generators::OutboxGenerator.start([], destination_root: destination, quiet: true)
-
-    migrations = Dir[File.join(destination, "db", "migrate", "*.rb")]
-
-    assert_equal 1, migrations.size, "the generator did not write exactly one migration"
-    body = File.read(migrations.first)
+    body = generate_migration
 
     assert_match(/class CreateOutboxEvents < ActiveRecord::Migration/, body)
     assert_match(/create_table :outbox_events/, body)
@@ -224,35 +216,53 @@ class RailtieTest < TestSupport::Test
   end
 
   def test_the_generator_refuses_to_overwrite_an_existing_migration
-    destination = File.join(Dir.tmpdir, "cafaye-generator-twice-#{Process.pid}")
-    FileUtils.mkdir_p(destination)
+    with_generator_destination do |destination|
+      2.times { run_generator(destination) }
 
-    2.times do
-      Cafaye::Generators::OutboxGenerator.start([], destination_root: destination, quiet: true)
+      assert_equal 1, Dir[File.join(destination, "db", "migrate", "*.rb")].size
     end
-
-    assert_equal 1, Dir[File.join(destination, "db", "migrate", "*.rb")].size
-  ensure
-    FileUtils.rm_rf(destination)
   end
 
-  def test_the_generator_migration_is_the_reference_ddl_in_ruby_and_names_core
-    destination = File.join(Dir.tmpdir, "cafaye-generator-body-#{Process.pid}")
-    FileUtils.mkdir_p(destination)
-    Cafaye::Generators::OutboxGenerator.start([], destination_root: destination, quiet: true)
-    body = File.read(Dir[File.join(destination, "db", "migrate", "*.rb")].first)
+  def test_the_generator_migration_keeps_every_check_constraint_from_the_reference_ddl
+    body = generate_migration
 
     # Every CHECK constraint in the reference DDL has to survive the trip into
     # the host app, or a service that used the generator has a weaker table than
     # one that copied the file.
-    Cafaye::Outbox.ddl.scan(/constraint (\w+)/).flatten.each do |constraint|
-      assert_includes body, constraint
-    end
+    names = Cafaye::Outbox.ddl.scan(/constraint (\w+)/).flatten
+
+    refute_empty names
+    names.each { |constraint| assert_includes body, constraint }
+  end
+
+  private
+
+  # Thor writes its progress to stdout, which is noise in a test run. Captured,
+  # and the capture is where a generator that printed a stack trace would land
+  # rather than in the middle of the suite's output.
+  def with_generator_destination
+    destination = File.join(Dir.tmpdir, "cafaye-generator-#{Process.pid}-#{rand(1 << 32)}")
+    FileUtils.mkdir_p(destination)
+    yield destination
   ensure
     FileUtils.rm_rf(destination)
   end
 
-  private
+  def run_generator(destination)
+    original = $stdout
+    $stdout = StringIO.new
+    Cafaye::Generators::OutboxGenerator.start([], destination_root: destination, quiet: true)
+    $stdout.string
+  ensure
+    $stdout = original
+  end
+
+  def generate_migration
+    with_generator_destination do |destination|
+      run_generator(destination)
+      Dir[File.join(destination, "db", "migrate", "*.rb")].then { |files| File.read(files.first) }
+    end
+  end
 
   def configure!
     Cafaye.configure do |config|

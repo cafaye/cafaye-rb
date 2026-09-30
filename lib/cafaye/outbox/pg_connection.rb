@@ -118,7 +118,23 @@ module Cafaye
         @connection.exec_params(MARK_FAILED_SQL, [ id ])
       end
 
+      # Run the block in a transaction, **joining one that is already open**.
+      #
+      # `pg`'s own `Connection#transaction` is not nesting-aware: it issues
+      # `BEGIN` unconditionally and commits in an `ensure`, so calling it inside a
+      # transaction that a caller opened makes PostgreSQL warn that a transaction
+      # is already in progress and then commit the caller's work early. For a
+      # library whose entire promise is that the caller's transaction decides
+      # whether the row survives, committing it from underneath is the one bug
+      # this class must not have.
+      #
+      # So a nested call joins. The outermost `run_once` opens and commits; a
+      # nested one enlists, and its marks are rolled back with the caller's
+      # transaction if that rolls back — which is the correct answer, because the
+      # rows are still claimable.
       def transaction
+        return yield if in_transaction?
+
         @connection.transaction { yield }
       end
 
