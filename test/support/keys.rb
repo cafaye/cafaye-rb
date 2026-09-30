@@ -44,14 +44,18 @@ module TestSupport
       # is legal but says less — and the whole point of a stand-in is that it
       # cannot be more permissive than the thing it stands in for.
       def public_jwk(rsa, kid)
-        jwk = JWT::JWK.new(rsa.public_key)
+        # `JWT::JWK#export` hands back symbol keys; a JWKS document on the wire
+        # has string keys, and the fetcher under test is parsing JSON, so the
+        # stand-in has to be string-keyed to be honest about what it serves.
+        exported = JWT::JWK.new(rsa.public_key).export.transform_keys(&:to_s)
+
         {
-          "kty" => "RSA",
+          "kty" => exported.fetch("kty"),
           "kid" => kid,
           "use" => "sig",
           "alg" => "RS256",
-          "n" => jwk.n,
-          "e" => jwk.e
+          "n" => exported.fetch("n"),
+          "e" => exported.fetch("e")
         }
       end
     end

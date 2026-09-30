@@ -16,6 +16,7 @@ require_relative "support/frozen_clock"
 require_relative "support/jwks_server"
 require_relative "support/keys"
 require_relative "support/log_capture"
+require_relative "support/tokens"
 
 module TestSupport
   # The coverage report and its floor.
@@ -30,15 +31,15 @@ module TestSupport
   # to make a build green, is not — a threshold that moves down is a gate that
   # stopped being a gate.
   module Coverage
-    FLOOR = 60.0
+    FLOOR = 90.0
 
     # This gem's `lib/`, as an absolute path.
     #
     # Not a substring match on "/lib/": the Ruby installation this suite runs
-    # under keeps the standard library at `…/lib/ruby/4.0.0/…`, which matches
+    # under keeps the standard library at `.../lib/ruby/4.0.0/...`, which matches
     # that substring, and the first version of this reporter scored 6252 lines
     # of stdlib against a repository with 60 lines in it.
-    LIB_DIR = File.expand_path("../../lib", __dir__)
+    LIB_DIR = File.expand_path("../lib", __dir__)
 
     module_function
 

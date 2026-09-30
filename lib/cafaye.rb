@@ -2,6 +2,13 @@
 
 require "cafaye/version"
 require "cafaye/errors"
+require "cafaye/principal"
+require "cafaye/token"
+require "cafaye/jwks/key_set"
+require "cafaye/jwks/transport"
+require "cafaye/jwks/fetcher"
+require "cafaye/jwks/cache"
+require "cafaye/token_verifier"
 
 # The shared Ruby library every cafaye Ruby service depends on, so that no
 # service hand-rolls token verification or the outbox insert.
